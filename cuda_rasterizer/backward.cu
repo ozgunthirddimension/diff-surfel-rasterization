@@ -159,6 +159,7 @@ renderCUDA(
 	const float* __restrict__ dL_depths,
 	float * __restrict__ dL_dtransMat,
 	float3* __restrict__ dL_dmean2D,
+	float3* __restrict__ dL_dmean2D_abs,
 	float* __restrict__ dL_dnormal3D,
 	float* __restrict__ dL_dopacity,
 	float* __restrict__ dL_dcolors)
@@ -430,6 +431,8 @@ renderCUDA(
 				const float dG_ddely = -G * FilterInvSquare * d.y;
 				atomicAdd(&dL_dmean2D[global_id].x, dL_dG * dG_ddelx); // not scaled
 				atomicAdd(&dL_dmean2D[global_id].y, dL_dG * dG_ddely); // not scaled
+				atomicAdd(&dL_dmean2D_abs[global_id].x, abs(dL_dG * dG_ddelx)); // not scaled
+				atomicAdd(&dL_dmean2D_abs[global_id].y, abs(dL_dG * dG_ddely)); // not scaled
 				atomicAdd(&dL_dtransMat[global_id * 9 + 8],  dL_dz); // propagate depth loss
 			}
 
@@ -596,6 +599,7 @@ __global__ void preprocessCUDA(
 	float* dL_dcolors,
 	float* dL_dshs,
 	float3* dL_dmean2Ds,
+	float3* dL_dmean2Ds_abs,
 	glm::vec3* dL_dmean3Ds,
 	glm::vec2* dL_dscales,
 	glm::vec4* dL_drots)
@@ -625,8 +629,10 @@ __global__ void preprocessCUDA(
 
 	// hack the gradient here for densitification
 	float depth = transMats[idx * 9 + 8];
-	dL_dmean2Ds[idx].x = dL_dtransMats[idx * 9 + 2] * depth * 0.5 * float(W); // to ndc
-	dL_dmean2Ds[idx].y = dL_dtransMats[idx * 9 + 5] * depth * 0.5 * float(H); // to ndc
+	dL_dmean2Ds[idx].x += dL_dtransMats[idx * 9 + 2] * depth * 0.5 * float(W); // to ndc
+	dL_dmean2Ds[idx].y += dL_dtransMats[idx * 9 + 5] * depth * 0.5 * float(H); // to ndc
+	dL_dmean2Ds_abs[idx].x += abs(dL_dtransMats[idx * 9 + 2] * depth * 0.5 * float(W)); // to ndc
+	dL_dmean2Ds_abs[idx].y += abs(dL_dtransMats[idx * 9 + 5] * depth * 0.5 * float(H)); // to ndc
 }
 
 
@@ -646,6 +652,7 @@ void BACKWARD::preprocess(
 	const float tan_fovx, const float tan_fovy,
 	const glm::vec3* campos,
 	float3* dL_dmean2Ds,
+	float3* dL_dmean2Ds_abs,
 	const float* dL_dnormal3Ds,
 	float* dL_dtransMats,
 	float* dL_dcolors,
@@ -676,6 +683,7 @@ void BACKWARD::preprocess(
 		dL_dcolors,
 		dL_dshs,
 		dL_dmean2Ds,
+		dL_dmean2Ds_abs,
 		dL_dmean3Ds,
 		dL_dscales,
 		dL_drots
@@ -700,6 +708,7 @@ void BACKWARD::render(
 	const float* dL_depths,
 	float * dL_dtransMat,
 	float3* dL_dmean2D,
+	float3* dL_dmean2D_abs,
 	float* dL_dnormal3D,
 	float* dL_dopacity,
 	float* dL_dcolors)
@@ -722,6 +731,7 @@ void BACKWARD::render(
 		dL_depths,
 		dL_dtransMat,
 		dL_dmean2D,
+		dL_dmean2D_abs,
 		dL_dnormal3D,
 		dL_dopacity,
 		dL_dcolors
