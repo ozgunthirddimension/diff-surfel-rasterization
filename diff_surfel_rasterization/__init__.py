@@ -21,6 +21,7 @@ def cpu_deep_copy_tuple(input_tuple):
 def rasterize_gaussians(
     means3D,
     means2D,
+    means2D_abs,
     sh,
     colors_precomp,
     opacities,
@@ -32,6 +33,7 @@ def rasterize_gaussians(
     return _RasterizeGaussians.apply(
         means3D,
         means2D,
+        means2D_abs,
         sh,
         colors_precomp,
         opacities,
@@ -187,7 +189,7 @@ class GaussianRasterizer(nn.Module):
 
         return visible
 
-    def forward(self, means3D, means2D, opacities, shs = None, colors_precomp = None, scales = None, rotations = None, cov3D_precomp = None):
+    def forward(self, means3D, means2D, means2D_abs, opacities, shs = None, colors_precomp = None, scales = None, rotations = None, cov3D_precomp = None):
 
         raster_settings = self.raster_settings
 
@@ -214,6 +216,7 @@ class GaussianRasterizer(nn.Module):
         return rasterize_gaussians(
             means3D,
             means2D,
+            means2D_abs,
             shs,
             colors_precomp,
             opacities,
